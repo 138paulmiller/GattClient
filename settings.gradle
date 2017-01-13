@@ -1,0 +1,1 @@
+include ':app', ':estimote-sdk-0.15.0'
