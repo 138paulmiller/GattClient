@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -197,7 +198,33 @@ public class GattClientService extends Service {
                 Log.i("GattClientService:", "Read GattCharacteristic:" + characteristic);
             }else{
                 Log.i("GattClientService:", "Failed to Read GattCharacteristic: STATUS:" +status);
-
+            }
+        }
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic
+                characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i("GattClientService:", "Wrote GattCharacteristic:" + characteristic);
+            }else{
+                Log.i("GattClientService:", "Failed to Wrote GattCharacteristic: STATUS:" +status);
+            }
+        }
+        @Override
+        public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
+                                     int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i("GattClientService:", "Wrote GattDescriptor" + descriptor);
+            }else{
+                Log.i("GattClientService:", "Failed to Wrote GattDescriptor: STATUS:" +status);
+            }
+        }
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
+                                      int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i("GattClientService:", "Wrote GattDescriptor:" + descriptor);
+            }else{
+                Log.i("GattClientService:", "Failed to Wrote GattDescriptor: STATUS:" +status);
             }
         }
     };

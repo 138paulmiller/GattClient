@@ -3,6 +3,7 @@ package com.paul138.gattclient;
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.content.ComponentName;
 import android.content.Context;
@@ -76,12 +77,15 @@ public class MainActivity extends Activity {
     }
         @Override
         public void onGattServicesDiscovered(final List<BluetoothGattService> gattServices, boolean valid){
-            Log.i("GattCallbackInterface", gattServices.size() + " Gatt Services discovered");
+
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     if(gattServices != null) {
+                        Log.i("GattCallbackInterface", gattServices.size() + " Gatt Services discovered");
+
                         onServicesDiscovered(gattServices);
+
                     }else{
                         Log.i("MainActivity", "No Services Found on GATT Server");
                     }
@@ -178,7 +182,14 @@ public class MainActivity extends Activity {
                             textViewLog.append("\nTrying to Connect to Device Addr:" + data + "...\n");
                             mGattClientService.connectToDevice(data);
                         }else if(group == GROUP_SERVICE){
+                            textViewLog.append("\nTrying to Read Characteristics at Service UUID:" + data + "...\n");
 
+                            List<BluetoothGattCharacteristic> characteristics = mGattProfile.readCharacteristics(data);
+                            if(characteristics == null){
+                                textViewLog.append("FAILED to Read Characteristics\n");
+                            }else{
+                                onCharacteristicsDiscovered(characteristics);
+                            }
                         }else if(group == GROUP_CHARACTERISTIC){
 
                         }
@@ -275,8 +286,6 @@ public class MainActivity extends Activity {
             textViewLog.append("Connected to GATT Server on device:\n   " + bluetoothGatt.getDevice().getAddress() + "\n");
             //update data map
 
-
-
         }
 
 
@@ -291,17 +300,36 @@ public class MainActivity extends Activity {
         }
     }
     public void onServicesDiscovered(List<BluetoothGattService> gattServices){
+        //update data map
+        int serviceIndex = mExpandableListGroups.indexOf(GROUP_SERVICE);
+        List<String> childList = mExpandableListChildMap.get(mExpandableListGroups.get(serviceIndex));
+        childList.clear();
+        //add new child data
+
         for (int i = 0; i < gattServices.size(); i++) {
             BluetoothGattService service = gattServices.get(i);
-            //Log.i("MainActivity", "Service UUID:" + gattServices.get(i).getUuid());
-            //update data map
-            int serviceIndex = mExpandableListGroups.indexOf(GROUP_SERVICE);
-            List<String> childList = mExpandableListChildMap.get(mExpandableListGroups.get(serviceIndex));
-            if(childList != null && service != null && serviceIndex >= 0 ){
+            Log.i("MainActivity", "Service UUID:" + gattServices.get(i).getUuid());
+                        if(childList != null && service != null && serviceIndex >= 0 ){
                 childList.add(service.getUuid().toString());
                 mExpandableListAdapter.notifyDataSetChanged();
             }
-            mGattProfile.addService(gattServices.get(i));
+            mGattProfile.addService(gattServices.get(i).getUuid().toString(), gattServices.get(i));
+        }
+        mExpandableListAdapter.notifyDataSetChanged();
+    }
+    public void onCharacteristicsDiscovered(List<BluetoothGattCharacteristic> gattCharacteristics){
+        //update data map
+        int characteristicIndex = mExpandableListGroups.indexOf(GROUP_CHARACTERISTIC);
+        List<String> childList = mExpandableListChildMap.get(mExpandableListGroups.get(characteristicIndex));
+        childList.clear();
+        //add new chiild data
+        for (int i = 0; i < gattCharacteristics.size(); i++) {
+            BluetoothGattCharacteristic characteristic = gattCharacteristics.get(i);
+            //Log.i("MainActivity", "Service UUID:" + gattServices.get(i).getUuid());
+          if(childList != null && characteristic != null && characteristicIndex >= 0 ){
+                childList.add(characteristic.getUuid().toString());
+                mExpandableListAdapter.notifyDataSetChanged();
+            }
             mExpandableListAdapter.notifyDataSetChanged();
 
         }
