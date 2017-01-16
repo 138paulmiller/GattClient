@@ -16,30 +16,37 @@ import android.provider.Settings;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ExpandableListView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
 public class MainActivity extends Activity {
 
-    ArrayList<String> listItems = new ArrayList<>(); //device address list
-    ListView listView; //device list view
+    ExpandableListAdapter mExpandableListAdapter;
+    ExpandableListView mExpandableListView;
+    List<String> mExpandableListGroups;
+    HashMap<String, List<String>> mExpandableListChildMap;
     TextView textViewLog;
     Button scanButton,clearButton; //buttons
-    ArrayAdapter<String> adapter; //handles data in list view as strings
+    final String GROUP_DEVICE = "BLE Device Addresses";
+    final String GROUP_SERVICE ="GATT Service UUIDs";
+    final String GROUP_CHARACTERISTIC ="Service Characteristics";
     private GattClientService mGattClientService = null;
     private boolean mBound = false;
+
+    private GattProfile mGattProfile;
     private GattClientService.GattCallbackInterface mBLEInterface = new GattClientService.GattCallbackInterface() {
         @Override
         public void onGattDeviceFound(final BluetoothDevice device, final String id) {
-            Log.i("MainActivity:", "Found Device:\n\tADDR : " + device.getAddress());
+            Log.i("GattCallbackInterface:", "Found Device:\n\tADDR : " + device.getAddress());
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -49,7 +56,7 @@ public class MainActivity extends Activity {
         }
         @Override
         public void onGattServerConnected(final BluetoothGatt bluetoothGatt){
-            Log.i("MainActivity:", "Connected to Device:\n\tADDR : " + bluetoothGatt.getDevice().getAddress());
+            Log.i("GattCallbackInterface:", "Connected to Device:\n\tADDR : " + bluetoothGatt.getDevice().getAddress());
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -59,7 +66,7 @@ public class MainActivity extends Activity {
     }
         @Override
         public void onGattServerDisconnected(final BluetoothGatt bluetoothGatt){
-            Log.i("MainActivity:", "Disconnected from Device:\n\tADDR : " + bluetoothGatt.getDevice().getAddress());
+            Log.i("GattCallbackInterface:", "Disconnected from Device:\n\tADDR : " + bluetoothGatt.getDevice().getAddress());
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -69,7 +76,17 @@ public class MainActivity extends Activity {
     }
         @Override
         public void onGattServicesDiscovered(final List<BluetoothGattService> gattServices, boolean valid){
-
+            Log.i("GattCallbackInterface", gattServices.size() + " Gatt Services discovered");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(gattServices != null) {
+                        onServicesDiscovered(gattServices);
+                    }else{
+                        Log.i("MainActivity", "No Services Found on GATT Server");
+                    }
+                }
+            });
         }
     };
 
@@ -85,34 +102,11 @@ public class MainActivity extends Activity {
             intent.setData(uri); //send this app package as an argument to settings intent
             startActivity(intent); //start settings activity
         }
-        textViewLog =  ((TextView)findViewById(R.id.textView));
-        adapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_list_item_1,
-                listItems);
-        listView = ((ListView) findViewById(R.id.listView));
+        textViewLog =  ((TextView)findViewById(R.id.textViewLog));
+        textViewLog.setMovementMethod(new ScrollingMovementMethod());
 
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                String addr  = String.valueOf(((TextView)view ).getText());
-                Log.i("MainActivity", "Clicked Item : " + addr);
-                if (mGattClientService != null) {
-                    if(mGattClientService.isConnected()){
-                        textViewLog.append("Disconnecting from device :\n    " + addr + " ...\n");
-                        mGattClientService.disconnectFromDevice();
-                    }
-                    else{
-                       textViewLog.append("Trying to connect to device:\n   " + addr + " ...\n");
-                        if(!mGattClientService.connectToDevice(addr)){ //if fails then fails to connect to gatt server
-                            Toast.makeText(view.getContext(), "Unable to find GATT Server on Device!", Toast.LENGTH_SHORT).show();
-                        }
-                    }
 
-                };
-            }
-        });
-        adapter.notifyDataSetChanged();
+
         scanButton = ((Button) findViewById(R.id.buttonScan));
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -138,15 +132,65 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if(mGattClientService != null) mGattClientService.clearAvailableDevices();
-                adapter.clear();
-                adapter.notifyDataSetChanged();
-                textViewLog.getEditableText().clear();
+                for(String s: mExpandableListGroups){
+                    mExpandableListChildMap.get(s).clear();
+                }
+                mExpandableListAdapter.notifyDataSetChanged();
+
+                if(textViewLog.getEditableText() != null)textViewLog.getEditableText().clear();
+                textViewLog.bringPointIntoView(0);
             }
         });
 
-       textViewLog.setMovementMethod(new ScrollingMovementMethod());
+        mGattProfile = new GattProfile();
+        mExpandableListGroups = new ArrayList<String>();
+        mExpandableListChildMap = new HashMap<String, List<String>>();
+        // Adding map data
+        mExpandableListGroups.add(GROUP_DEVICE);
+        mExpandableListGroups.add(GROUP_SERVICE);
+        mExpandableListGroups.add(GROUP_CHARACTERISTIC);
+        mExpandableListChildMap.put(GROUP_DEVICE, new ArrayList<String>());
+        mExpandableListChildMap.put(GROUP_SERVICE, new ArrayList<String>());
+        mExpandableListChildMap.put(GROUP_CHARACTERISTIC, new ArrayList<String>());
 
 
+        mExpandableListAdapter = new ExpandableListAdapter(this, mExpandableListGroups, mExpandableListChildMap);
+
+        mExpandableListView = (ExpandableListView) findViewById(R.id.expandableListView);
+        // setting list adapter
+        mExpandableListView.setAdapter(mExpandableListAdapter);
+        for(int i=0; i< mExpandableListGroups.size(); i++)
+            mExpandableListView.expandGroup(i);
+        mExpandableListView.setOnChildClickListener(new ExpandableListView.OnChildClickListener() {
+            @Override
+            public boolean onChildClick(ExpandableListView parent, View v,
+                                        int groupPosition, int listPosition, long id) {
+                String group = mExpandableListGroups.get(groupPosition);
+                if(mGattClientService != null){
+                    if(group != null){
+                        String data = mExpandableListChildMap.get( mExpandableListGroups.get(groupPosition))
+                                .get(listPosition);
+
+                        Toast.makeText(parent.getContext(), group + ":" + data, Toast.LENGTH_SHORT).show();
+                        Log.i("ExpandableListView",group + ":" + data);
+
+                        if(group == GROUP_DEVICE){
+                            textViewLog.append("\nTrying to Connect to Device Addr:" + data + "...\n");
+                            mGattClientService.connectToDevice(data);
+                        }else if(group == GROUP_SERVICE){
+
+                        }else if(group == GROUP_CHARACTERISTIC){
+
+                        }
+                    }
+                }else{
+                    Log.e("ExpandableListView","OnClicked Child: GATT SERVICE NOT CONNECTED TO ACTIVITY!");
+                }
+
+
+                return false;
+            }
+        });
     }
 
     @Override
@@ -180,8 +224,14 @@ public class MainActivity extends Activity {
     protected void onStop() {
         super.onStop();
         if (mBound) {
-            unbindService(mConnection);
-            mBound = false;
+            if(mGattClientService != null) mGattClientService.clearAvailableDevices();
+            mGattClientService.scanLeDevice(false);
+            for(String s: mExpandableListGroups){
+                mExpandableListChildMap.get(s).clear();
+            }
+            mExpandableListAdapter.notifyDataSetChanged();
+            //unbindService(mConnection);
+           // mBound = false;
         }
     }
 
@@ -211,23 +261,57 @@ public class MainActivity extends Activity {
 
     private void onDeviceFound(final BluetoothDevice device, String id) {
         Log.i("MainActivity", "Found Device ADDR:" + id);
-        adapter.add(id);
-        adapter.notifyDataSetChanged();
+        //update data map
+        int deviceIndex = mExpandableListGroups.indexOf(GROUP_DEVICE);
+        List<String> childList = mExpandableListChildMap.get(mExpandableListGroups.get(deviceIndex));
+        if(childList != null && device != null && deviceIndex >= 0 ){
+            childList.add(device.getAddress());
+            mExpandableListAdapter.notifyDataSetChanged();
+        }
+        mExpandableListAdapter.notifyDataSetChanged();
     }
     private void onDeviceConnected(final BluetoothGatt bluetoothGatt) {
         if (bluetoothGatt != null) {
-            ((TextView) findViewById(R.id.textView)).append("Connected to GATT Server on device:\n   " + bluetoothGatt.getDevice().getAddress() + "\n");
+            textViewLog.append("Connected to GATT Server on device:\n   " + bluetoothGatt.getDevice().getAddress() + "\n");
+            //update data map
+
+
+
         }
+
+
     }
     private void onDeviceDisconnected(final BluetoothGatt bluetoothGatt) {
         if (bluetoothGatt != null) {
-            ((TextView) findViewById(R.id.textView)).append("Disconnected from device:\n   " + bluetoothGatt.getDevice().getAddress() + "\n");
+            textViewLog.append("Disconnected from device:\n   " + bluetoothGatt.getDevice().getAddress() + "\n");
+           //update data map
+
+            mExpandableListAdapter.notifyDataSetChanged();
+
         }
+    }
+    public void onServicesDiscovered(List<BluetoothGattService> gattServices){
+        for (int i = 0; i < gattServices.size(); i++) {
+            BluetoothGattService service = gattServices.get(i);
+            //Log.i("MainActivity", "Service UUID:" + gattServices.get(i).getUuid());
+            //update data map
+            int serviceIndex = mExpandableListGroups.indexOf(GROUP_SERVICE);
+            List<String> childList = mExpandableListChildMap.get(mExpandableListGroups.get(serviceIndex));
+            if(childList != null && service != null && serviceIndex >= 0 ){
+                childList.add(service.getUuid().toString());
+                mExpandableListAdapter.notifyDataSetChanged();
+            }
+            mGattProfile.addService(gattServices.get(i));
+            mExpandableListAdapter.notifyDataSetChanged();
+
+        }
+
     }
     public boolean checkPermissions(){
             String permission = "android.permission.ACCESS_COARSE_LOCATION";
             int res = this.checkCallingOrSelfPermission(permission);
             return (res == PackageManager.PERMISSION_GRANTED);
     }
+
 }
 

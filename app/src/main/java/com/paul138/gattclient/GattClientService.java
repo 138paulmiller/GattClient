@@ -27,8 +27,8 @@ import java.util.List;
 public class GattClientService extends Service {
     private boolean scanning = false;
     private BluetoothGatt mBluetoothGatt;
-    private BluetoothAdapter mBluetoothAdapter; //adapter to scan for le devices
-    // Initializes Bluetooth adapter.
+    private BluetoothAdapter mBluetoothAdapter; //deviceListAdapter to scan for le devices
+    // Initializes Bluetooth deviceListAdapter.
     private static BluetoothManager mBluetoothManager; //bluetooth system service management class
     private static boolean mBound = false;
     private static boolean mBluetoothSupported = false;
@@ -104,6 +104,7 @@ public class GattClientService extends Service {
     public void disconnectFromDevice(){
         if(mBluetoothGatt != null) {
             mBluetoothGatt.disconnect();
+            mGattConnected = false;
         }
 
     }
@@ -124,6 +125,7 @@ public class GattClientService extends Service {
             mBluetoothGatt = d.connectGatt(this,false,mGattCallback);
             if(mBluetoothGatt != null ) {
                 mBluetoothGatt.connect();
+                mGattConnected = true;
                 return true;
             }
             else
